@@ -11,7 +11,7 @@ WORKDIR /app
 COPY . /app
 
 # Install any needed packages
-RUN pip install --no-cache-dir git+https://github.com/openai/whisper.git flask torch ffmpeg-python
+RUN pip install --no-cache-dir git+https://github.com/openai/whisper.git flask torch ffmpeg-python flask-cors
 
 # Make port 5000 available to the world outside this container
 EXPOSE 5001

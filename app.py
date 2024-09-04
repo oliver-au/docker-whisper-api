@@ -1,9 +1,12 @@
 from flask import Flask, request, jsonify
+from flask_cors import CORS  # Import CORS
 import whisper
 import os
 import ffmpeg
 
 app = Flask(__name__)
+CORS(app)  # Enable CORS for all routes
+
 model = whisper.load_model("medium")  # Use the model that suits your needs
 
 def extract_audio_from_video(video_path, audio_path):

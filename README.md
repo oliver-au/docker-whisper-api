@@ -21,7 +21,7 @@ This project provides a transcription service using OpenAI's Whisper model. It a
 
 3. **Run the Docker container:**
     ```sh
-    docker run -d -p 5001:5001 --name whisper-transcription whisper-transcription-service
+    docker run --gpus all -d -p 5001:5001 --name whisper-transcription whisper-transcription-service
     ```
 
 ## Using the API
