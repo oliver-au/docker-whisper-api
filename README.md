@@ -49,7 +49,7 @@ curl -X POST http://localhost:5001/transcribe -F "audio=@/path/to/your/file.mp3"
 $apiEndpoint = "http://localhost:5001/transcribe"
 
 # Define the video file extensions to process (add more if needed)
-$videoExtensions = @("*.mkv")  # Add other extensions like "*.mp4", "*.avi" if required
+$videoExtensions = @("*.mkv", "*.mp4", "*.avi", "*.mov")  # Add other extensions as required
 
 # Retrieve all video files in the current directory and subdirectories
 $videoFiles = Get-ChildItem -Path . -Recurse -Include $videoExtensions -File
@@ -65,10 +65,10 @@ foreach ($file in $videoFiles) {
     $filePath      = $file.FullName
     $fileDirectory = $file.DirectoryName
     $baseName      = [System.IO.Path]::GetFileNameWithoutExtension($file.Name)
-    
+
     # Define the transcriptions folder path within the file's directory
     $transcriptionsFolder = Join-Path $fileDirectory "transcriptions"
-    
+
     # Create the 'transcriptions' folder if it doesn't exist
     if (-Not (Test-Path -Path $transcriptionsFolder)) {
         try {
@@ -80,25 +80,25 @@ foreach ($file in $videoFiles) {
             continue  # Skip to the next file
         }
     }
-    
+
     # Define the output transcription file path
     $outputFilePath = Join-Path $transcriptionsFolder "$baseName.txt"
-    
+
     # Check if the transcription file already exists
     if (Test-Path -Path $outputFilePath) {
-        Write-Host "Skipping '$($file.FullName)': Transcription already exists."
+        Write-Host "Skipping '$filePath': Transcription already exists."
         continue  # Skip to the next file
     }
-    
+
     Write-Host "Processing file: $filePath"
     Write-Host "Saving transcription to: $outputFilePath"
-    
+
     try {
         # Call the transcription API using curl.exe
         $transcription = curl.exe --location $apiEndpoint `
             --form "audio=@`"$filePath`"" `
             --silent
-        
+
         # Validate the response
         if (-not [string]::IsNullOrWhiteSpace($transcription)) {
             # Save the transcription string to a .txt file
