@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, Response
 from flask_cors import CORS  # Import CORS
 import whisper
 import os
@@ -15,6 +15,12 @@ def extract_audio_from_video(video_path, audio_path):
         ffmpeg.input(video_path).output(audio_path).run(quiet=True, overwrite_output=True)
     except ffmpeg.Error as e:
         raise Exception(f"Failed to extract audio: {e}")
+
+def format_time_vtt(seconds):
+    hours, remainder = divmod(int(seconds), 3600)
+    minutes, seconds_part = divmod(remainder, 60)
+    milliseconds = int((seconds - int(seconds)) * 1000)
+    return f"{hours:02}:{minutes:02}:{seconds_part:02}.{milliseconds:03}"
 
 @app.route('/transcribe', methods=['POST'])
 def transcribe():
@@ -36,10 +42,19 @@ def transcribe():
     try:
         # Transcribe audio file using Whisper
         result = model.transcribe(audio_path)
-        os.remove(file_path)  # Clean up the uploaded file
+        segments = result.get('segments', [])
+
+        # Build transcript in desired format
+        transcript_output = '\n\n'.join([
+            f"{format_time_vtt(seg['start'])} --> {format_time_vtt(seg['end'])}\n {seg['text']}"
+            for seg in segments
+        ])
+
+        os.remove(file_path)
         if audio_path != file_path:
-            os.remove(audio_path)  # Clean up the extracted audio file
-        return jsonify({'transcript': result['text']})
+            os.remove(audio_path)
+
+        return Response(transcript_output, mimetype='text/plain')
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

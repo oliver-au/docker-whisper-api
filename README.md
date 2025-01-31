@@ -40,3 +40,38 @@ Once the container is running, you can use the `/transcribe` endpoint to transcr
 
 ```sh
 curl -X POST http://localhost:5001/transcribe -F "audio=@/path/to/your/file.mp3"
+```
+
+### Example using PowerShell
+
+```powershell
+# Check if the transcription file already exists
+if (Test-Path -Path $outputFilePath) {
+    Write-Host "Skipping '$($file.Name)': Transcription already exists."
+    continue
+}
+
+Write-Host "Processing file: $($file.Name)"
+Write-Host "Saving transcription to: $outputFilePath"
+
+try {
+    # Call the transcription API using curl.exe
+    $transcription = curl.exe --location "http://localhost:5001/transcribe" `
+        --form "audio=@`"$inputFilePath`"" `
+        --silent
+
+    # Validate the response (optional)
+    if (-not [string]::IsNullOrWhiteSpace($transcription)) {
+        # Save the transcription string to a .txt file
+        $transcription | Out-File -FilePath $outputFilePath -Encoding UTF8
+        Write-Host "Transcription saved successfully for: $baseName`n"
+    }
+    else {
+        Write-Warning "Received empty transcription for '$($file.Name)'. Skipping save."
+    }
+}
+catch {
+    Write-Error "Failed to process '$($file.Name)'. Error: $_"
+}
+```
+
