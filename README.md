@@ -45,33 +45,74 @@ curl -X POST http://localhost:5001/transcribe -F "audio=@/path/to/your/file.mp3"
 ### Example using PowerShell
 
 ```powershell
-# Check if the transcription file already exists
-if (Test-Path -Path $outputFilePath) {
-    Write-Host "Skipping '$($file.Name)': Transcription already exists."
-    continue
+# Define the transcription API endpoint
+$apiEndpoint = "http://localhost:5001/transcribe"
+
+# Define the video file extensions to process (add more if needed)
+$videoExtensions = @("*.mkv")  # Add other extensions like "*.mp4", "*.avi" if required
+
+# Retrieve all video files in the current directory and subdirectories
+$videoFiles = Get-ChildItem -Path . -Recurse -Include $videoExtensions -File
+
+# Check if any video files were found
+if ($videoFiles.Count -eq 0) {
+    Write-Host "No video files found in the current directory or its subdirectories."
+    exit 0
 }
 
-Write-Host "Processing file: $($file.Name)"
-Write-Host "Saving transcription to: $outputFilePath"
-
-try {
-    # Call the transcription API using curl.exe
-    $transcription = curl.exe --location "http://localhost:5001/transcribe" `
-        --form "audio=@`"$inputFilePath`"" `
-        --silent
-
-    # Validate the response (optional)
-    if (-not [string]::IsNullOrWhiteSpace($transcription)) {
-        # Save the transcription string to a .txt file
-        $transcription | Out-File -FilePath $outputFilePath -Encoding UTF8
-        Write-Host "Transcription saved successfully for: $baseName`n"
+# Iterate over each video file
+foreach ($file in $videoFiles) {
+    $filePath      = $file.FullName
+    $fileDirectory = $file.DirectoryName
+    $baseName      = [System.IO.Path]::GetFileNameWithoutExtension($file.Name)
+    
+    # Define the transcriptions folder path within the file's directory
+    $transcriptionsFolder = Join-Path $fileDirectory "transcriptions"
+    
+    # Create the 'transcriptions' folder if it doesn't exist
+    if (-Not (Test-Path -Path $transcriptionsFolder)) {
+        try {
+            New-Item -ItemType Directory -Path $transcriptionsFolder -Force | Out-Null
+            Write-Host "Created folder: $transcriptionsFolder"
+        }
+        catch {
+            Write-Error "Failed to create folder '$transcriptionsFolder'. Error: $_"
+            continue  # Skip to the next file
+        }
     }
-    else {
-        Write-Warning "Received empty transcription for '$($file.Name)'. Skipping save."
+    
+    # Define the output transcription file path
+    $outputFilePath = Join-Path $transcriptionsFolder "$baseName.txt"
+    
+    # Check if the transcription file already exists
+    if (Test-Path -Path $outputFilePath) {
+        Write-Host "Skipping '$($file.FullName)': Transcription already exists."
+        continue  # Skip to the next file
+    }
+    
+    Write-Host "Processing file: $filePath"
+    Write-Host "Saving transcription to: $outputFilePath"
+    
+    try {
+        # Call the transcription API using curl.exe
+        $transcription = curl.exe --location $apiEndpoint `
+            --form "audio=@`"$filePath`"" `
+            --silent
+        
+        # Validate the response
+        if (-not [string]::IsNullOrWhiteSpace($transcription)) {
+            # Save the transcription string to a .txt file
+            $transcription | Out-File -FilePath $outputFilePath -Encoding UTF8
+            Write-Host "Transcription saved successfully for: $baseName`n"
+        }
+        else {
+            Write-Warning "Received empty transcription for '$filePath'. Skipping save."
+        }
+    }
+    catch {
+        Write-Error "Failed to process '$filePath'. Error: $_"
     }
 }
-catch {
-    Write-Error "Failed to process '$($file.Name)'. Error: $_"
-}
+
 ```
 

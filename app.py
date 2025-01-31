@@ -7,7 +7,7 @@ import ffmpeg
 app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
 
-model = whisper.load_model("medium")  # Use the model that suits your needs
+model = whisper.load_model("turbo")  # Use the model that suits your needs
 
 def extract_audio_from_video(video_path, audio_path):
     """Extract audio from video file."""
