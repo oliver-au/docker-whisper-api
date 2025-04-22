@@ -45,8 +45,10 @@ curl -X POST http://localhost:5001/transcribe -F "audio=@/path/to/your/file.mp3"
 ### Example using PowerShell
 
 ```powershell
-# Define the transcription API endpoint
-$apiEndpoint = "http://localhost:5001/transcribe"
+# Define the base transcription API endpoint
+$baseApiEndpoint = "http://localhost:5001/transcribe"
+$baseApiEndpointVtt = "http://localhost:5001/transcribe?format=vtt"
+$baseApiEndpointText = "http://localhost:5001/transcribe?format=text"
 
 # Define the video file extensions to process (add more if needed)
 $videoExtensions = @("*.mkv", "*.mp4", "*.avi", "*.mov")  # Add other extensions as required
@@ -66,53 +68,73 @@ foreach ($file in $videoFiles) {
     $fileDirectory = $file.DirectoryName
     $baseName      = [System.IO.Path]::GetFileNameWithoutExtension($file.Name)
 
-    # Define the transcriptions folder path within the file's directory
-    $transcriptionsFolder = Join-Path $fileDirectory "transcriptions"
+    # Define the transcriptions folder paths within the file's directory
+    $vttFolder = Join-Path $fileDirectory "transcriptions-vtt"
+    $textFolder = Join-Path $fileDirectory "transcriptions-text"
 
-    # Create the 'transcriptions' folder if it doesn't exist
-    if (-Not (Test-Path -Path $transcriptionsFolder)) {
+    # Create the folders if they don't exist
+    foreach ($folder in @($vttFolder, $textFolder)) {
+        if (-Not (Test-Path -Path $folder)) {
+            try {
+                New-Item -ItemType Directory -Path $folder -Force | Out-Null
+                Write-Host "Created folder: $folder"
+            }
+            catch {
+                Write-Error "Failed to create folder '$folder'. Error: $_"
+                # Decide if you want to continue with the file or skip entirely
+                # continue 2 # Uncomment to skip this file entirely if folder creation fails
+            }
+        }
+    }
+
+    # --- Process VTT Format ---
+    $vttOutputFilePath = Join-Path $vttFolder "$baseName.vtt"
+    if (Test-Path -Path $vttOutputFilePath) {
+        Write-Host "Skipping VTT for '$filePath': Transcription already exists."
+    } else {
+        Write-Host "Processing VTT for file: $filePath"
+        Write-Host "Saving VTT transcription to: $vttOutputFilePath"
         try {
-            New-Item -ItemType Directory -Path $transcriptionsFolder -Force | Out-Null
-            Write-Host "Created folder: $transcriptionsFolder"
-        }
-        catch {
-            Write-Error "Failed to create folder '$transcriptionsFolder'. Error: $_"
-            continue  # Skip to the next file
-        }
-    }
+            $vttApiEndpoint = $baseApiEndpointVtt
+            $vttTranscription = curl.exe --location $vttApiEndpoint `
+                --form "audio=@`"$filePath`"" `
+                --silent
 
-    # Define the output transcription file path
-    $outputFilePath = Join-Path $transcriptionsFolder "$baseName.txt"
-
-    # Check if the transcription file already exists
-    if (Test-Path -Path $outputFilePath) {
-        Write-Host "Skipping '$filePath': Transcription already exists."
-        continue  # Skip to the next file
-    }
-
-    Write-Host "Processing file: $filePath"
-    Write-Host "Saving transcription to: $outputFilePath"
-
-    try {
-        # Call the transcription API using curl.exe
-        $transcription = curl.exe --location $apiEndpoint `
-            --form "audio=@`"$filePath`"" `
-            --silent
-
-        # Validate the response
-        if (-not [string]::IsNullOrWhiteSpace($transcription)) {
-            # Save the transcription string to a .txt file
-            $transcription | Out-File -FilePath $outputFilePath -Encoding UTF8
-            Write-Host "Transcription saved successfully for: $baseName`n"
-        }
-        else {
-            Write-Warning "Received empty transcription for '$filePath'. Skipping save."
+            if (-not [string]::IsNullOrWhiteSpace($vttTranscription)) {
+                $vttTranscription | Out-File -FilePath $vttOutputFilePath -Encoding UTF8
+                Write-Host "VTT Transcription saved successfully for: $baseName"
+            } else {
+                Write-Warning "Received empty VTT transcription for '$filePath'. Skipping save."
+            }
+        } catch {
+            Write-Error "Failed to process VTT for '$filePath'. Error: $_"
         }
     }
-    catch {
-        Write-Error "Failed to process '$filePath'. Error: $_"
+
+    # --- Process Text Format ---
+    $textOutputFilePath = Join-Path $textFolder "$baseName.txt"
+    if (Test-Path -Path $textOutputFilePath) {
+        Write-Host "Skipping Text for '$filePath': Transcription already exists."
+    } else {
+        Write-Host "Processing Text for file: $filePath"
+        Write-Host "Saving Text transcription to: $textOutputFilePath"
+        try {
+            $textApiEndpoint = $baseApiEndpointText
+            $textTranscription = curl.exe --location $textApiEndpoint `
+                --form "audio=@`"$filePath`"" `
+                --silent
+
+            if (-not [string]::IsNullOrWhiteSpace($textTranscription)) {
+                $textTranscription | Out-File -FilePath $textOutputFilePath -Encoding UTF8
+                Write-Host "Text Transcription saved successfully for: $baseName"
+            } else {
+                Write-Warning "Received empty Text transcription for '$filePath'. Skipping save."
+            }
+        } catch {
+            Write-Error "Failed to process Text for '$filePath'. Error: $_"
+        }
     }
+    Write-Host "" # Add a newline for better readability between files
 }
-
 ```
 

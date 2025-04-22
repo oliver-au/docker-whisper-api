@@ -31,6 +31,9 @@ def transcribe():
     file_path = os.path.join("uploads", file.filename)
     file.save(file_path)
 
+    # Get format from query parameters, default to 'vtt'
+    output_format = request.args.get('format', 'vtt').lower()
+
     # Determine the file type
     file_ext = file.filename.rsplit('.', 1)[-1].lower()
     if file_ext in ['mp4', 'mkv', 'avi', 'mov']:  # Add more video formats as needed
@@ -44,18 +47,29 @@ def transcribe():
         result = model.transcribe(audio_path)
         segments = result.get('segments', [])
 
-        # Build transcript in desired format
-        transcript_output = '\n\n'.join([
-            f"{format_time_vtt(seg['start'])} --> {format_time_vtt(seg['end'])}\n {seg['text']}"
-            for seg in segments
-        ])
+        # Build transcript based on the requested format
+        if output_format == 'text':
+            transcript_output = '\n'.join([seg['text'].strip() for seg in segments])
+        else: # Default to VTT format
+            transcript_output = "WEBVTT\n\n" # Add WEBVTT header for standard VTT
+            transcript_output += '\n\n'.join([
+                f"{format_time_vtt(seg['start'])} --> {format_time_vtt(seg['end'])}\n{seg['text'].strip()}" # Ensure text is stripped
+                for seg in segments
+            ])
 
         os.remove(file_path)
         if audio_path != file_path:
             os.remove(audio_path)
 
-        return Response(transcript_output, mimetype='text/plain')
+        # Set mimetype based on format
+        mimetype = 'text/vtt' if output_format == 'vtt' else 'text/plain'
+        return Response(transcript_output, mimetype=mimetype)
     except Exception as e:
+        # Clean up files even if transcription fails
+        if os.path.exists(file_path):
+            os.remove(file_path)
+        if audio_path != file_path and os.path.exists(audio_path):
+            os.remove(audio_path)
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
